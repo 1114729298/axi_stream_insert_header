@@ -1,6 +1,6 @@
 `timescale 		1ns/1ns
 
-module main_tb();
+module axi_stream_insert_header_tb();
 parameter DATA_WD = 32;
 parameter DATA_BYTE_WD = DATA_WD / 8 ;
 parameter BYTE_CNT_WD = $clog2(DATA_BYTE_WD);
