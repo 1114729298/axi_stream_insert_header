@@ -34,8 +34,7 @@ reg [DATA_BYTE_WD-1 : 0]   keep_insert_r;
 reg                        valid_insert_r;
 reg                        last_out_r;
 reg [DATA_BYTE_WD-1 : 0]   keep_o;
-reg [2*DATA_WD-1 : 0]      data_o_1;
-reg [2*DATA_WD-1 : 0]      data_o_2;
+reg [63 : 0]        data_o;
 reg                        valid_out_r;
 reg                        insert_flag;                      //插入标志信号，0表示未插入，1表示已插入
 wire                       data_in_flag;
@@ -53,17 +52,17 @@ always@(posedge clk or negedge rst_n)
 if(!rst_n)begin
      data_in_r<=0;
      keep_in_r<=0;
-	 last_in_r<=0;
+     last_in_r<=0;
      end
 else if(data_in_flag)begin
      data_in_r<=data_in;
      keep_in_r<=keep_in;
-	 last_in_r<=last_in;
+     last_in_r<=last_in;
      end
 else begin
      data_in_r<=data_in;
      keep_in_r<='b0;
-	 last_in_r<='b0;
+     last_in_r<='b0;
      end
 
 always@(posedge clk or negedge rst_n)
@@ -84,38 +83,46 @@ always@(posedge clk or negedge rst_n)
 if(!rst_n)
      last_out_r<=1'b0;
 else last_out_r<=last_in_r;
-	 
+ 
 always@(posedge clk or negedge rst_n)
 if(!rst_n) begin
      valid_in_r<=1'b0;
-	 valid_insert_r<=1'b0;
-	 end
+     valid_insert_r<=1'b0;
+     end
 else begin 
      valid_in_r<=valid_in;
-	 valid_insert_r<=valid_insert;
-	 end
+     valid_insert_r<=valid_insert;
+     end
 //////////////////////////////////////////////////////
 //输出数据产生
 //////////////////////////////////////////////////////            
 
 always@(posedge clk or negedge rst_n)
 if(!rst_n)begin
-	 data_o_1<=32'b0;
-	 data_o_2<=32'b0;
+     data_o<=64'b0;
      end
 else if(data_in_flag&&data_insert_flag&&~insert_flag)begin
-     data_o_1={data_insert,data_in};
-	 data_o_2=data_o_1<<(DATA_BYTE_WD-byte_insert_cnt)*8;
-	 insert_flag=1'b1;
+     case(keep_insert)
+     4'b1111:begin data_o<={data_insert,data_in};insert_flag=1'b1;end
+     4'b0111:begin data_o<={data_insert,data_in}<<8;insert_flag=1'b1;end
+     4'b0011:begin data_o<={data_insert,data_in}<<16;insert_flag=1'b1;end
+     4'b0001:begin data_o<={data_insert,data_in}<<24;insert_flag=1'b1;end
+     default:begin data_o<=data_o;insert_flag=1'b1;end
+     endcase
      end
-else if(ready_in&&insert_flag)begin
-     data_o_1={data_in_r,data_in};
-	 data_o_2=data_o_1<<(DATA_BYTE_WD-byte_insert_cnt)*8;
+else if(data_in_flag&&insert_flag)begin
+     case(keep_insert_r)
+     4'b1111: data_o<={data_in_r,data_in};
+     4'b0111: data_o<={data_in_r,data_in}<<8;
+     4'b0011: data_o<={data_in_r,data_in}<<16;
+     4'b0001: data_o<={data_in_r,data_in}<<24;
+     default: data_o<=data_o;
+     endcase
      end 
 else if(last_in_r)
-     data_o_2<=data_o_2<<DATA_WD;
-else data_o_2<=data_o_2;
-	 
+     data_o<=data_o<<DATA_WD;
+else data_o<=data_o;
+ 
 always@(posedge clk or negedge rst_n)
 if(!rst_n)
     insert_flag<='b0;
@@ -130,20 +137,12 @@ begin
     else if(!last_in_r)
         keep_o <= 4'b1111;
     else if(last_in_r) 
-	keep_o <= keep_in<<(DATA_BYTE_WD-byte_insert_cnt);
+    keep_o <= keep_in<<(DATA_BYTE_WD-byte_insert_cnt);
  else;
 end
 
-//always@(posedge clk or negedge rst_n)
-//if(!rst_n)
-//    valid_out_r<='b0;
-//else if(ready_in)
-//    valid_out_r<=valid_in;
-//else valid_out_r<='b0;
-
 assign valid_out = ready_out? valid_in:valid_in_r;
-//assign valid_out = valid_out_r;
-assign data_out=data_o_2[2*DATA_WD-1 : DATA_WD];
+assign data_out=data_o[63:32];
 assign keep_out=keep_o;
 assign last_out=last_out_r;
 
